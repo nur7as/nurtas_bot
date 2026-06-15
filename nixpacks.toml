@@ -1,5 +1,8 @@
 [phases.setup]
-nixPkgs = ["python312"]
+nixPkgs = ["python311", "gcc", "rustc", "cargo"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
 
 [start]
 cmd = "python bot.py"
