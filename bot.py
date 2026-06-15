@@ -5,8 +5,9 @@ from aiogram.types import (
     Message, CallbackQuery,
     InlineKeyboardMarkup, InlineKeyboardButton
 )
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.fsm.storage.memory import MemoryStorage
+from database import Database
 import asyncio
 
 # ── CONFIG ──
@@ -19,6 +20,7 @@ PRICE      = "7 000 ₸"
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp  = Dispatcher(storage=MemoryStorage())
+db  = Database()
 
 # ── KEYBOARDS ──
 def kb_pay():
@@ -37,6 +39,15 @@ def kb_admin(user_id: int):
 # ── HANDLERS ──
 @dp.message(CommandStart())
 async def cmd_start(msg: Message):
+    user = msg.from_user
+
+    if db.is_subscriber(user.id):
+        await msg.answer(
+            "Сен каналға кіруді бұрын сатып алдың! ✅\n\n"
+            "Егер сілтеме жоғалып кетсе — @nurtas_issabek-ке жаз."
+        )
+        return
+
     text = (
         "Сәлем! 👋\n\n"
         "Бұл — <b>«Kaspi 13 000+ кейс»</b> жабық каналы.\n\n"
@@ -53,6 +64,7 @@ async def cmd_start(msg: Message):
 
 @dp.callback_query(F.data == "paid")
 async def cb_paid(call: CallbackQuery):
+    db.add_pending(call.from_user.id)
     await call.message.answer(
         "Жақсы! 👍\n\n"
         "Енді төлем скриншотын осы жерге жібер.\n"
@@ -63,7 +75,12 @@ async def cb_paid(call: CallbackQuery):
 @dp.message(F.photo)
 async def receive_screenshot(msg: Message):
     user = msg.from_user
-    name = user.full_name
+
+    if db.is_subscriber(user.id):
+        await msg.answer("Сен каналға кіруді бұрын сатып алдың! ✅")
+        return
+
+    name     = user.full_name
     username = f"@{user.username}" if user.username else "username жоқ"
 
     caption = (
@@ -96,6 +113,18 @@ async def approve(call: CallbackQuery):
             chat_id=CHANNEL_ID,
             member_limit=1
         )
+
+        try:
+            chat = await bot.get_chat(user_id)
+            full_name = chat.full_name or ""
+            username  = chat.username or ""
+        except Exception:
+            full_name = ""
+            username  = ""
+
+        db.add_subscriber(user_id, full_name, username)
+        db.remove_pending(user_id)
+
         await bot.send_message(
             chat_id=user_id,
             text=(
@@ -118,6 +147,7 @@ async def approve(call: CallbackQuery):
 @dp.callback_query(F.data.startswith("reject_"))
 async def reject(call: CallbackQuery):
     user_id = int(call.data.split("_")[1])
+    db.remove_pending(user_id)
 
     await bot.send_message(
         chat_id=user_id,
@@ -135,12 +165,37 @@ async def reject(call: CallbackQuery):
     await call.answer("Қабылданбады ❌")
 
 # ── ADMIN COMMANDS ──
-@dp.message(F.text == "/start", F.from_user.id == ADMIN_ID)
-async def admin_start(msg: Message):
+@dp.message(Command("users"))
+async def cmd_users(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    subscribers = db.get_all_subscribers()
+    count = db.get_count()
+
+    if not subscribers:
+        await msg.answer("Әзірше ешкім сатып алмаған.")
+        return
+
+    text = f"👥 Жалпы сатып алушылар: <b>{count}</b>\n\n"
+    for i, s in enumerate(subscribers, 1):
+        username = f"@{s['username']}" if s['username'] else "—"
+        text += f"{i}. {s['full_name']} | {username} | {s['added_at']}\n"
+
+    await msg.answer(text, parse_mode="HTML")
+
+@dp.message(Command("stats"))
+async def cmd_stats(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+
+    count = db.get_count()
+    revenue = count * 7000
     await msg.answer(
-        "👋 Сәлем, Нуртас!\n\n"
-        "Бот жұмыс істеп тұр ✅\n\n"
-        "Пайдаланушы скриншот жіберсе — саған хабарлама келеді."
+        f"📊 Статистика\n\n"
+        f"👥 Сатып алушылар: <b>{count}</b>\n"
+        f"💰 Жалпы табыс: <b>{revenue:,} ₸</b>".replace(",", " "),
+        parse_mode="HTML"
     )
 
 # ── RUN ──
