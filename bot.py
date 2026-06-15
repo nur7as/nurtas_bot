@@ -15,7 +15,9 @@ BOT_TOKEN  = os.getenv("BOT_TOKEN")
 ADMIN_ID   = int(os.getenv("ADMIN_ID", "646654612"))
 CHANNEL_ID = os.getenv("CHANNEL_ID", "-1004344613555")
 KASPI_LINK = os.getenv("KASPI_LINK", "https://pay.kaspi.kz/pay/tmchkblz")
-PRICE      = "7 000 ₸"
+PRICE      = "15 000 ₸"
+CARD       = "5269 8800 1480 4728"
+CARD_NAME  = "Нуртас И."
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
@@ -23,11 +25,14 @@ dp  = Dispatcher(storage=MemoryStorage())
 db  = Database()
 
 # ── KEYBOARDS ──
-def kb_pay():
+def kb_start():
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text=f"💳 Kaspi арқылы төлеу — {PRICE}", url=KASPI_LINK)
-    ], [
-        InlineKeyboardButton(text="✅ Төледім, скриншот жіберемін", callback_data="paid")
+        InlineKeyboardButton(text=f"💳 Төлем жасау [{PRICE}]", callback_data="show_payment")
+    ]])
+
+def kb_payment():
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🔗 Kaspi Pay арқылы төлеу →", url=KASPI_LINK)
     ]])
 
 def kb_admin(user_id: int):
@@ -49,29 +54,55 @@ async def cmd_start(msg: Message):
         return
 
     text = (
-        "Сәлем! 👋\n\n"
-        "Бұл — <b>«Kaspi 13 000+ кейс»</b> жабық каналы.\n\n"
-        "Ішінде не бар:\n"
-        "— Авторлық ежедневникті нөлден қалай жасадым\n"
-        "— Дизайн, типография, бірінші тираж\n"
-        "— Kaspi магазин, карточка, отзывтар\n"
-        "— Контент, таргет, 13 000+ сатылымға дейінгі жол\n"
-        "— Нақты скриншоттар мен цифрлар\n\n"
-        f"💰 Қатысу бағасы: <b>{PRICE}</b>\n\n"
-        "Төлем жасап, скриншот жіберсең — каналға кіру сілтемесін аласың."
+        "Авторлық өніміңді жасап сатқың келе ме?\n"
+        "Немесе печатный өнімің бар, бірақ сатылмай жатыр ма?\n\n"
+        "Көпшілік осылай тұрып қалады:\n"
+        "— Тауар бар, карточка бар, бірақ сатылым жоқ\n"
+        "— Біреулер топқа шығып кетеді, біреулер көрінбей қалады\n"
+        "— Рекламаға ақша кетеді, нәтиже жоқ\n"
+        "— Отзыв жинай алмайды, рейтинг көтерілмейді\n"
+        "— Идея бар, бірақ қайдан бастарын білмейді\n\n"
+        "Менің бастауым бірден нәтижелі болған жоқ.\n\n"
+        "2 жыл бұрын алғашқы авторлық блокноттарды тәуекел етіп бірден 1 000 дана шығардым.\n"
+        "Шығаруға ақшаны қарызға алдым. Каспи магазин жоқ. Тәжірибе жоқ.\n"
+        "Казпочта арқылы жіберіп отырдым —\n"
+        "әр клиентке өзім жауап беріп, адрестерін, номерлерін жинап,\n"
+        "казпочтада 2-3 сағат кезекте тұратынмын.\n\n"
+        "Алғашқы 3 айда — 40-50 дана ғана әрең сатылды.\n"
+        "Анализ жасай келе өте көп қателерімді анықтадым, жаңа стратегия, воронка продаж құрып\n"
+        "950 данасын келесі 2 айда сатып жіберіп, 2 есе тәуекелге бел буып\n"
+        "2 000 дана блокнот тағы шығардым. 2 айда бәрін сатып тастадым.\n\n"
+        "Бүгінге дейін жалпы 13 600+ сатылым. +50млн оборот. Бірнеше авторлық өнімдер.\n\n"
+        "Осы жабық каналда осы жолдың бәрін ашамын:\n"
+        "— Неге алғашқы 3 айда 40-50 ғана сатылды — қандай қате жасадым\n"
+        "— Не өзгерттім, өнімдерім қалай тез сатыла бастады?\n"
+        "— Контент, таргет — қандай видео сатты, қандай бюджет кетті\n"
+        "— Типография, дизайн — ценообразование, қандай дизайн өтімді, структурасы\n"
+        "— Каспи карточкасы, топқа шығу, отзыв жинау\n"
+        "— ИП, Kaspi Pay, налог, доставка, упаковка\n"
+        "— Тағы басқа да тәжірибелерім, қателерім және кеңестерім\n\n"
+        "Бұл курс емес, бұл менің өткен нақты жолым, нақты цифрлармен, нақты скриншоттармен.\n\n"
+        f"💰 Қатысу: <b>{PRICE}</b> — доступ навсегда"
     )
-    await msg.answer(text, parse_mode="HTML", reply_markup=kb_pay())
+    await msg.answer(text, parse_mode="HTML", reply_markup=kb_start())
 
-@dp.callback_query(F.data == "paid")
-async def cb_paid(call: CallbackQuery):
-    db.add_pending(call.from_user.id)
-    await call.message.answer(
-        "Жақсы! 👍\n\n"
-        "Енді төлем скриншотын осы жерге жібер.\n"
-        "Мен тексеріп, каналға кіру сілтемесін жіберемін."
+# ── SHOW PAYMENT ──
+@dp.callback_query(F.data == "show_payment")
+async def show_payment(call: CallbackQuery):
+    text = (
+        f"💳 Төлем жасау — <b>{PRICE}</b>\n\n"
+        "1-нұсқа — Kaspi Pay:\n"
+        "🔗 Төмендегі батырманы басыңыз\n\n"
+        "2-нұсқа — Басқа банк арқылы:\n"
+        f"<code>{CARD}</code>\n"
+        f"{CARD_NAME}\n\n"
+        "📸 Төлегеннен кейін скриншотты осы ботқа жіберіңіз\n\n"
+        "⏱ Скриншотты жібергеннен кейін 5-15 минут ішінде каналға сілтеме келеді!"
     )
+    await call.message.answer(text, parse_mode="HTML", reply_markup=kb_payment())
     await call.answer()
 
+# ── SCREENSHOT ──
 @dp.message(F.photo)
 async def receive_screenshot(msg: Message):
     user = msg.from_user
@@ -104,6 +135,7 @@ async def receive_screenshot(msg: Message):
         "Растағаннан кейін каналға сілтемені осы жерден аласың."
     )
 
+# ── APPROVE ──
 @dp.callback_query(F.data.startswith("approve_"))
 async def approve(call: CallbackQuery):
     user_id = int(call.data.split("_")[1])
@@ -144,6 +176,7 @@ async def approve(call: CallbackQuery):
 
     await call.answer("Расталды ✅")
 
+# ── REJECT ──
 @dp.callback_query(F.data.startswith("reject_"))
 async def reject(call: CallbackQuery):
     user_id = int(call.data.split("_")[1])
@@ -190,7 +223,7 @@ async def cmd_stats(msg: Message):
         return
 
     count = db.get_count()
-    revenue = count * 7000
+    revenue = count * 15000
     await msg.answer(
         f"📊 Статистика\n\n"
         f"👥 Сатып алушылар: <b>{count}</b>\n"
