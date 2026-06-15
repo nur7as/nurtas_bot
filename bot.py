@@ -80,24 +80,31 @@ async def cmd_start(msg: Message):
         "— ИП, Kaspi Pay, налог, доставка, упаковка\n"
         "— Тағы басқа да тәжірибелерім, қателерім және кеңестерім\n\n"
         "Бұл курс емес, бұл менің өткен нақты жолым, нақты цифрлармен, нақты скриншоттармен.\n\n"
-        f"💰 Қатысу: <b>{PRICE}</b> — доступ навсегда"
+        f"💰 Қатысу: <b>{PRICE}</b> — шексіз доступ"
     )
     await msg.answer(text, parse_mode="HTML", reply_markup=kb_start())
+
+# ── SHOW PAYMENT ──
+# ── KEYBOARDS ──
+def kb_start():
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="💳 Төлем жасау — 15 000 ₸", callback_data="show_payment")
+    ]])
 
 # ── SHOW PAYMENT ──
 @dp.callback_query(F.data == "show_payment")
 async def show_payment(call: CallbackQuery):
     text = (
-        f"💳 Төлем жасау — <b>{PRICE}</b>\n\n"
-        "1-нұсқа — Kaspi Pay:\n"
-        "🔗 Төмендегі батырманы басыңыз\n\n"
-        "2-нұсқа — Басқа банк арқылы:\n"
+        f"💳 <b>{PRICE}</b> - шексіз доступ\n\n"
+        f"1-нұсқа — Kaspi Pay:\n"
+        f'🔗 <a href="{KASPI_LINK}">Kaspi Pay арқылы төлеу →</a>\n\n'
+        f"2-нұсқа — Басқа банк арқылы:\n"
         f"<code>{CARD}</code>\n"
         f"{CARD_NAME}\n\n"
-        "📸 Төлегеннен кейін скриншотты осы ботқа жіберіңіз\n\n"
-        "⏱ Скриншотты жібергеннен кейін 5-15 минут ішінде каналға сілтеме келеді!"
+        f"📸 Төлегеннен кейін скриншотты осы ботқа жіберіңіз\n\n"
+        f"⏱ Скриншотты жібергеннен кейін 5-15 минут ішінде каналға сілтеме келеді!"
     )
-    await call.message.answer(text, parse_mode="HTML", reply_markup=kb_payment())
+    await call.message.answer(text, parse_mode="HTML")
     await call.answer()
 
 # ── SCREENSHOT ──
