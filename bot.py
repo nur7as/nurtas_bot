@@ -27,6 +27,8 @@ db  = Database()
 # ── FILE IDs (после первого запуска заполнятся автоматически) ──
 PHOTO_IDS = {}
 
+from aiogram.types import FSInputFile
+
 async def preload_photos():
     """Фотоларды дискіден жүктейді"""
     photos = {
@@ -36,14 +38,13 @@ async def preload_photos():
     for key, filename in photos.items():
         try:
             if os.path.exists(filename):
-                with open(filename, "rb") as f:
-                    msg = await bot.send_photo(
-                        chat_id=ADMIN_ID,
-                        photo=f,
-                        caption=f"✅ {key} жүктелді"
-                    )
-                    PHOTO_IDS[key] = msg.photo[-1].file_id
-                    logging.info(f"{key} file_id сақталды")
+                msg = await bot.send_photo(
+                    chat_id=ADMIN_ID,
+                    photo=FSInputFile(filename),
+                    caption=f"✅ {key} жүктелді"
+                )
+                PHOTO_IDS[key] = msg.photo[-1].file_id
+                logging.info(f"{key} file_id сақталды")
             else:
                 logging.warning(f"{filename} табылмады")
         except Exception as e:
