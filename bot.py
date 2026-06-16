@@ -28,27 +28,26 @@ db  = Database()
 PHOTO_IDS = {}
 
 async def preload_photos():
-    """Фотоларды GitHub-тан жүктеп file_id сақтайды"""
-    import aiohttp
+    """Фотоларды дискіден жүктейді"""
     photos = {
-        "photo1": "https://raw.githubusercontent.com/nur7as/nurtas_bot/main/photo1.png",
-        "photo2": "https://raw.githubusercontent.com/nur7as/nurtas_bot/main/photo2.png",
+        "photo1": "photo1.png",
+        "photo2": "photo2.png",
     }
-    async with aiohttp.ClientSession() as session:
-        for key, url in photos.items():
-            try:
-                async with session.get(url) as resp:
-                    if resp.status == 200:
-                        data = await resp.read()
-                        msg = await bot.send_photo(
-                            chat_id=ADMIN_ID,
-                            photo=("photo.png", data, "image/png"),
-                            caption=f"✅ {key} жүктелді"
-                        )
-                        PHOTO_IDS[key] = msg.photo[-1].file_id
-                        logging.info(f"{key} file_id сақталды: {PHOTO_IDS[key]}")
-            except Exception as e:
-                logging.error(f"{key} жүктеу қатесі: {e}")
+    for key, filename in photos.items():
+        try:
+            if os.path.exists(filename):
+                with open(filename, "rb") as f:
+                    msg = await bot.send_photo(
+                        chat_id=ADMIN_ID,
+                        photo=f,
+                        caption=f"✅ {key} жүктелді"
+                    )
+                    PHOTO_IDS[key] = msg.photo[-1].file_id
+                    logging.info(f"{key} file_id сақталды")
+            else:
+                logging.warning(f"{filename} табылмады")
+        except Exception as e:
+            logging.error(f"{key} қатесі: {e}")
 
 # ── KEYBOARDS ──
 def kb_start():
@@ -118,7 +117,7 @@ async def cmd_start(msg: Message):
         "Бұл курс емес.\n"
         "Бұл — менің нақты өткен жолым, нақты цифрлармен, нақты скриншоттармен.\n\n"
         f"💰 Presale баға: <b>{PRICE}</b> — шексіз доступ\n"
-        "⏳ Осы аптада ғана. Кейін 25 000 ₸ болады."
+        "⏳ Келесі аптада 22.06.2026, баға 25 000 ₸ болады."
     )
     await msg.answer(msg3, parse_mode="HTML")
     await asyncio.sleep(1)
