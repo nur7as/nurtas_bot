@@ -24,6 +24,32 @@ bot = Bot(token=BOT_TOKEN)
 dp  = Dispatcher(storage=MemoryStorage())
 db  = Database()
 
+# ── FILE IDs (после первого запуска заполнятся автоматически) ──
+PHOTO_IDS = {}
+
+async def preload_photos():
+    """Фотоларды GitHub-тан жүктеп file_id сақтайды"""
+    import aiohttp
+    photos = {
+        "photo1": "https://raw.githubusercontent.com/nur7as/nurtas_bot/main/photo1.png",
+        "photo2": "https://raw.githubusercontent.com/nur7as/nurtas_bot/main/photo2.png",
+    }
+    async with aiohttp.ClientSession() as session:
+        for key, url in photos.items():
+            try:
+                async with session.get(url) as resp:
+                    if resp.status == 200:
+                        data = await resp.read()
+                        msg = await bot.send_photo(
+                            chat_id=ADMIN_ID,
+                            photo=("photo.png", data, "image/png"),
+                            caption=f"✅ {key} жүктелді"
+                        )
+                        PHOTO_IDS[key] = msg.photo[-1].file_id
+                        logging.info(f"{key} file_id сақталды: {PHOTO_IDS[key]}")
+            except Exception as e:
+                logging.error(f"{key} жүктеу қатесі: {e}")
+
 # ── KEYBOARDS ──
 def kb_start():
     return InlineKeyboardMarkup(inline_keyboard=[[
@@ -91,9 +117,34 @@ async def cmd_start(msg: Message):
         "📌 Қателерім, тәжірибелерім, кеңестерім\n\n"
         "Бұл курс емес.\n"
         "Бұл — менің нақты өткен жолым, нақты цифрлармен, нақты скриншоттармен.\n\n"
-        f"💰 Қатысу: <b>{PRICE}</b> — шексіз доступ"
+        f"💰 Presale баға: <b>{PRICE}</b> — шексіз доступ\n"
+        "⏳ Осы аптада ғана. Кейін 25 000 ₸ болады."
     )
-    await msg.answer(msg3, parse_mode="HTML", reply_markup=kb_start())
+    await msg.answer(msg3, parse_mode="HTML")
+    await asyncio.sleep(1)
+
+    # Төртінші хабар — фотодоказательства
+    if PHOTO_IDS.get("photo1"):
+        await bot.send_photo(
+            chat_id=msg.chat.id,
+            photo=PHOTO_IDS["photo1"],
+            caption="📦 Нақты жұмыс — заказдар, накладной, Kaspi обороты"
+        )
+        await asyncio.sleep(1)
+
+    if PHOTO_IDS.get("photo2"):
+        await bot.send_photo(
+            chat_id=msg.chat.id,
+            photo=PHOTO_IDS["photo2"],
+            caption="⭐️ Оқушыларымның нәтижелері мен пікірлері"
+        )
+        await asyncio.sleep(1)
+
+    # Кнопка
+    await msg.answer(
+        "👇 Каналға қосылу үшін төлем жасаңыз:",
+        reply_markup=kb_start()
+    )
 
 # ── SHOW PAYMENT ──
 @dp.callback_query(F.data == "show_payment")
@@ -240,8 +291,17 @@ async def cmd_stats(msg: Message):
         parse_mode="HTML"
     )
 
+@dp.message(Command("reload_photos"))
+async def cmd_reload(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    await msg.answer("Фотолар қайта жүктелуде...")
+    await preload_photos()
+    await msg.answer(f"✅ Дайын. Жүктелген фотолар: {list(PHOTO_IDS.keys())}")
+
 # ── RUN ──
 async def main():
+    await preload_photos()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
