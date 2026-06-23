@@ -15,7 +15,7 @@ BOT_TOKEN  = os.getenv("BOT_TOKEN")
 ADMIN_ID   = int(os.getenv("ADMIN_ID", "646654612"))
 CHANNEL_ID = os.getenv("CHANNEL_ID", "-1004344613555")
 KASPI_LINK = os.getenv("KASPI_LINK", "https://pay.kaspi.kz/pay/tmchkblz")
-PRICE      = "15 000 ₸"
+PRICE      = "25 000 ₸"
 CARD       = "5269 8800 1480 4728"
 CARD_NAME  = "Нуртас И."
 
@@ -53,7 +53,7 @@ async def preload_photos():
 # ── KEYBOARDS ──
 def kb_start():
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="💳 Төлем жасау — 15 000 ₸", callback_data="show_payment")
+        InlineKeyboardButton(text="💳 Төлем жасау — 25 000 ₸", callback_data="show_payment")
     ]])
 
 def kb_admin(user_id: int):
@@ -109,16 +109,16 @@ async def cmd_start(msg: Message):
     # Үшінші хабар — оффер + кнопка
     msg3 = (
         "Осы жабық каналда осы жолдың бәрін ашамын:\n\n"
+        "📌 Нақты цифрлар: қанша жұмсадым, себестоимость неше? Қанша таза пайда таптым әр күнделіктен?\n"
         "📌 Идея қалай келді, қалай жүзеге асты, дизайн, типография, бюджет\n"
         "📌 Неге бастапқыда сатылым болмады, қандай қателер жасадым?\n"
         "📌 Не өзгерттім, өнімдерім қалай сатыла бастады? Қандай воронка продаж құрдым?\n"
         "📌 Каспи карточкасы, топқа шығу, отзыв жинау\n"
         "📌 ИП, Kaspi Pay, салық, жеткізу, упаковка жасау т.б.\n"
-        "📌 Қателерім, тәжірибелерім, кеңестерім\n\n"
+        "📌 -18млн қарыздан шығу жолым, 50 млн оборот\n\n"
         "Бұл курс емес.\n"
         "Бұл — менің нақты өткен жолым, нақты цифрлармен, нақты скриншоттармен.\n\n"
-        f"💰 Presale баға: <b>{PRICE}</b> — шексіз доступ\n"
-        "⏳ Келесі аптада 22.06.2026, баға 25 000 ₸ болады."
+        f"💰 <b>{PRICE}</b> — шексіз доступ"
     )
     await msg.answer(msg3, parse_mode="HTML")
     await asyncio.sleep(1)
@@ -283,7 +283,7 @@ async def cmd_stats(msg: Message):
         return
 
     count = db.get_count()
-    revenue = count * 15000
+    revenue = count * 25000
     await msg.answer(
         f"📊 Статистика\n\n"
         f"👥 Сатып алушылар: <b>{count}</b>\n"
