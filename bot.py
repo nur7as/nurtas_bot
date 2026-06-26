@@ -3,7 +3,8 @@ import logging
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
     Message, CallbackQuery,
-    InlineKeyboardMarkup, InlineKeyboardButton
+    InlineKeyboardMarkup, InlineKeyboardButton,
+    FSInputFile
 )
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -24,13 +25,10 @@ bot = Bot(token=BOT_TOKEN)
 dp  = Dispatcher(storage=MemoryStorage())
 db  = Database()
 
-# ── FILE IDs (после первого запуска заполнятся автоматически) ──
+# ── FILE IDs ──
 PHOTO_IDS = {}
 
-from aiogram.types import FSInputFile
-
 async def preload_photos():
-    """Фотоларды дискіден жүктейді"""
     photos = {
         "photo1": "photo1.png",
         "photo2": "photo2.png",
@@ -62,10 +60,56 @@ def kb_admin(user_id: int):
         InlineKeyboardButton(text="❌ Қабылдамау", callback_data=f"reject_{user_id}")
     ]])
 
+def kb_analytics():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📅 Бүгін", callback_data="analytics_today")],
+        [InlineKeyboardButton(text="📅 7 күн", callback_data="analytics_7")],
+        [InlineKeyboardButton(text="📅 30 күн", callback_data="analytics_30")],
+        [InlineKeyboardButton(text="📊 Жалпы", callback_data="analytics_all")],
+    ])
+
+# ── ANALYTICS HELPER ──
+def format_analytics(data: dict, label: str, spend: float = 0) -> str:
+    starts     = data.get("start", 0)
+    pay_clicks = data.get("pay_click", 0)
+    screenshots= data.get("screenshot", 0)
+    approved   = data.get("approved", 0)
+    rejected   = data.get("rejected", 0)
+
+    # Конверсия
+    conv_pay  = f"{pay_clicks/starts*100:.1f}%" if starts > 0 else "—"
+    conv_buy  = f"{approved/starts*100:.1f}%" if starts > 0 else "—"
+    conv_close= f"{approved/screenshots*100:.1f}%" if screenshots > 0 else "—"
+
+    # ROMI және CAC
+    revenue = approved * 25000
+    romi    = f"{(revenue - spend) / spend * 100:.0f}%" if spend > 0 else "—"
+    cac     = f"{spend / approved:.0f} ₸" if approved > 0 and spend > 0 else "—"
+
+    return (
+        f"📊 Аналитика — {label}\n\n"
+        f"👁 /start басты: {starts}\n"
+        f"💳 Төлем кнопкасын басты: {pay_clicks} ({conv_pay})\n"
+        f"📸 Скриншот жіберді: {screenshots}\n"
+        f"✅ Сатып алды: {approved} ({conv_buy})\n"
+        f"❌ Қабылданбады: {rejected}\n\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"💰 Табыс: {revenue:,} ₸\n".replace(",", " ") +
+        (f"📢 Таргет шығыны: {spend:,.0f} ₸\n".replace(",", " ") if spend > 0 else "") +
+        f"📈 ROMI: {romi}\n"
+        f"🎯 CAC: {cac}\n\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"🔽 Воронка:\n"
+        f"Start → Скриншот: {conv_pay}\n"
+        f"Скриншот → Сатылым: {conv_close}\n"
+        f"Start → Сатылым: {conv_buy}"
+    )
+
 # ── HANDLERS ──
 @dp.message(CommandStart())
 async def cmd_start(msg: Message):
     user = msg.from_user
+    db.track(user.id, "start")
 
     if db.is_subscriber(user.id):
         await msg.answer(
@@ -74,7 +118,6 @@ async def cmd_start(msg: Message):
         )
         return
 
-    # Бірінші хабар — боль
     msg1 = (
         "Авторлық өніміңді жасап сатқың келе ме?\n"
         "Немесе өз өнімің бар, бірақ сатылмай жатыр ма?\n\n"
@@ -88,7 +131,6 @@ async def cmd_start(msg: Message):
     await msg.answer(msg1)
     await asyncio.sleep(2)
 
-    # Екінші хабар — история
     msg2 = (
         "Менің бастауым да бірден нәтижелі болған жоқ.\n\n"
         "2 жыл бұрын тәуекел етіп бастадым, себебі:\n\n"
@@ -106,16 +148,14 @@ async def cmd_start(msg: Message):
     await msg.answer(msg2)
     await asyncio.sleep(2)
 
-    # Үшінші хабар — оффер + кнопка
     msg3 = (
         "Осы жабық каналда осы жолдың бәрін ашамын:\n\n"
-        "📌 Нақты цифрлар: қанша жұмсадым, себестоимость неше? Қанша таза пайда таптым әр күнделіктен?\n"
         "📌 Идея қалай келді, қалай жүзеге асты, дизайн, типография, бюджет\n"
         "📌 Неге бастапқыда сатылым болмады, қандай қателер жасадым?\n"
         "📌 Не өзгерттім, өнімдерім қалай сатыла бастады? Қандай воронка продаж құрдым?\n"
         "📌 Каспи карточкасы, топқа шығу, отзыв жинау\n"
         "📌 ИП, Kaspi Pay, салық, жеткізу, упаковка жасау т.б.\n"
-        "📌 -18млн қарыздан шығу жолым, 50 млн оборот\n\n"
+        "📌 Қателерім, тәжірибелерім, кеңестерім\n\n"
         "Бұл курс емес.\n"
         "Бұл — менің нақты өткен жолым, нақты цифрлармен, нақты скриншоттармен.\n\n"
         f"💰 <b>{PRICE}</b> — шексіз доступ"
@@ -123,7 +163,6 @@ async def cmd_start(msg: Message):
     await msg.answer(msg3, parse_mode="HTML")
     await asyncio.sleep(1)
 
-    # Төртінші хабар — фотодоказательства
     if PHOTO_IDS.get("photo1"):
         await bot.send_photo(
             chat_id=msg.chat.id,
@@ -140,7 +179,6 @@ async def cmd_start(msg: Message):
         )
         await asyncio.sleep(1)
 
-    # Кнопка
     await msg.answer(
         "👇 Каналға қосылу үшін төлем жасаңыз:",
         reply_markup=kb_start()
@@ -149,8 +187,9 @@ async def cmd_start(msg: Message):
 # ── SHOW PAYMENT ──
 @dp.callback_query(F.data == "show_payment")
 async def show_payment(call: CallbackQuery):
+    db.track(call.from_user.id, "pay_click")
     text = (
-        f"💳 <b>{PRICE} — шексіз доступ</b>\n\n"
+        f"💳 <b>25 000 ₸ — шексіз доступ</b>\n\n"
         f"1-нұсқа — Kaspi Pay:\n"
         f'🔗 <a href="{KASPI_LINK}">Kaspi Pay арқылы төлеу →</a>\n\n'
         f"2-нұсқа — Басқа банк арқылы:\n"
@@ -166,6 +205,7 @@ async def show_payment(call: CallbackQuery):
 @dp.message(F.photo)
 async def receive_screenshot(msg: Message):
     user = msg.from_user
+    db.track(user.id, "screenshot")
 
     if db.is_subscriber(user.id):
         await msg.answer("Сен каналға кіруді бұрын сатып алдың! ✅")
@@ -199,6 +239,7 @@ async def receive_screenshot(msg: Message):
 @dp.callback_query(F.data.startswith("approve_"))
 async def approve(call: CallbackQuery):
     user_id = int(call.data.split("_")[1])
+    db.track(user_id, "approved")
 
     try:
         link = await bot.create_chat_invite_link(
@@ -240,6 +281,7 @@ async def approve(call: CallbackQuery):
 @dp.callback_query(F.data.startswith("reject_"))
 async def reject(call: CallbackQuery):
     user_id = int(call.data.split("_")[1])
+    db.track(user_id, "rejected")
     db.remove_pending(user_id)
 
     await bot.send_message(
@@ -262,26 +304,21 @@ async def reject(call: CallbackQuery):
 async def cmd_users(msg: Message):
     if msg.from_user.id != ADMIN_ID:
         return
-
     subscribers = db.get_all_subscribers()
     count = db.get_count()
-
     if not subscribers:
         await msg.answer("Әзірше ешкім сатып алмаған.")
         return
-
     text = f"👥 Жалпы сатып алушылар: <b>{count}</b>\n\n"
     for i, s in enumerate(subscribers, 1):
         username = f"@{s['username']}" if s['username'] else "—"
         text += f"{i}. {s['full_name']} | {username} | {s['added_at']}\n"
-
     await msg.answer(text, parse_mode="HTML")
 
 @dp.message(Command("stats"))
 async def cmd_stats(msg: Message):
     if msg.from_user.id != ADMIN_ID:
         return
-
     count = db.get_count()
     revenue = count * 25000
     await msg.answer(
@@ -290,6 +327,48 @@ async def cmd_stats(msg: Message):
         f"💰 Жалпы табыс: <b>{revenue:,} ₸</b>".replace(",", " "),
         parse_mode="HTML"
     )
+
+@dp.message(Command("analytics"))
+async def cmd_analytics(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    data = db.get_analytics()
+    text = format_analytics(data, "Жалпы барлық уақыт")
+    await msg.answer(text, reply_markup=kb_analytics())
+
+@dp.callback_query(F.data.startswith("analytics_"))
+async def cb_analytics(call: CallbackQuery):
+    if call.from_user.id != ADMIN_ID:
+        return
+
+    period = call.data.split("_")[1]
+    from datetime import datetime, timedelta
+
+    now = datetime.now()
+
+    if period == "today":
+        date_from = now.strftime("%Y-%m-%d 00:00")
+        date_to   = now.strftime("%Y-%m-%d 23:59")
+        label = "Бүгін"
+    elif period == "7":
+        date_from = (now - timedelta(days=7)).strftime("%Y-%m-%d 00:00")
+        date_to   = now.strftime("%Y-%m-%d 23:59")
+        label = "Соңғы 7 күн"
+    elif period == "30":
+        date_from = (now - timedelta(days=30)).strftime("%Y-%m-%d 00:00")
+        date_to   = now.strftime("%Y-%m-%d 23:59")
+        label = "Соңғы 30 күн"
+    else:
+        data = db.get_analytics()
+        text = format_analytics(data, "Жалпы барлық уақыт")
+        await call.message.edit_text(text, reply_markup=kb_analytics())
+        await call.answer()
+        return
+
+    data = db.get_analytics(date_from, date_to)
+    text = format_analytics(data, label)
+    await call.message.edit_text(text, reply_markup=kb_analytics())
+    await call.answer()
 
 @dp.message(Command("reload_photos"))
 async def cmd_reload(msg: Message):
